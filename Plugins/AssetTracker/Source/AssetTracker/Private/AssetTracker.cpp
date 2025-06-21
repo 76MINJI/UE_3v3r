@@ -233,35 +233,43 @@ void FAssetTrackerModule::LoadMetaJson()
 
     MetaMap.Empty();  // 이전 내용이 있다면 초기화
 
-    for (auto& Entry : JsonArray)
+    for (auto& EntryVal : JsonArray)
     {
-        if (TSharedPtr<FJsonObject> Obj = Entry->AsObject())
+        if (TSharedPtr<FJsonObject> Obj = EntryVal->AsObject())
         {
-            FString UUID = Obj->GetStringField(TEXT("uuid"));
+            //FString UUID = Obj->GetStringField(TEXT("uuid"));
             //FString Filename = Obj->GetStringField(TEXT("filename"));
 
             // chatId (문자열이든 숫자든, JSON에 "chatId": 8 혹은 "8" 둘 다 처리)
-            int32 ChatId = 0;
-            if (Obj->TryGetNumberField(TEXT("chatId"), ChatId) == false)
-            {
-                ChatId = FCString::Atoi(*Obj->GetStringField(TEXT("chatId")));
-            }
-            FString Base64Data = Obj->GetStringField(TEXT("base64Image"));
-
-            TArray<uint8> ImageBytes;
-            FBase64::Decode(Base64Data, ImageBytes);
+            //int32 ChatId = 0;
+            //if (Obj->TryGetNumberField(TEXT("chatId"), ChatId) == false)
+            //{
+            //    ChatId = FCString::Atoi(*Obj->GetStringField(TEXT("chatId")));
+            //}
+            //FString Base64Data = Obj->GetStringField(TEXT("base64Image"));
+            //TArray<uint8> ImageBytes;
+            //FBase64::Decode(Base64Data, ImageBytes);
 
             // MetaMap.Add(Name, UUID);
             // 맵에 저장
-            FMetaEntry EntryData;
-            EntryData.Uuid = UUID;
-            EntryData.ChatId = ChatId;
-            MetaMap.Add(UUID, EntryData);
-
+            //FMetaEntry EntryData;
+            //EntryData.Uuid = UUID;
+            //EntryData.ChatId = ChatId;
+            
+            //MetaMap.Add(UUID, EntryData);
+            
+            //UE_LOG(LogTemp, Log,
+            //    TEXT("AssetTracker: uuid=%s, chatId=%d"),
+            //    *UUID, ChatId
+            //);
+            FMetaEntry Entry;
+            Entry.Uuid = Obj->GetStringField(TEXT("uuid"));
+            Entry.ChatId = Obj->GetIntegerField(TEXT("chatId"));
+            Entry.UserId = Obj->GetIntegerField(TEXT("userId"));
+            MetaMap.Add(Entry.Uuid, Entry);
             UE_LOG(LogTemp, Log,
-                TEXT("AssetTracker: uuid=%s, chatId=%d"),
-                *UUID, ChatId
-            );
+                TEXT("Loaded meta: uuid=%s chatId=%d userId=%d"),
+                *Entry.Uuid, Entry.ChatId, Entry.UserId);
         }
     }
 }
@@ -367,13 +375,14 @@ void FAssetTrackerModule::OnObjectPropertyChanged(UObject* Object, FPropertyChan
     if (UUID.IsEmpty()) return;
 
     // 해당 UUID에 대응하는 chatId 찾기
-    int32 ChatId = 0;
+    int32 ChatId = 0, UserId = 0;
     for (const auto& Pair : MetaMap)
     {
         const FMetaEntry& Entry = Pair.Value;
         if (Entry.Uuid == UUID)
         {
             ChatId = Entry.ChatId;
+            UserId = Entry.UserId;
             break;
         }
     }
@@ -399,21 +408,21 @@ void FAssetTrackerModule::OnObjectPropertyChanged(UObject* Object, FPropertyChan
     {
         UE_LOG(LogTemp, Warning, TEXT("[TrackLogGG] %s location changed — UUID: %s — Pos: %s — Time: %s"),
             *Actor->GetName(), *UUID, *CurrentTransform.GetLocation().ToCompactString(), *TimeStr);
-        SendActorTrackLog(Actor, UUID, ChatId, TEXT("RelativeLocation"));
+        SendActorTrackLog(Actor, UUID, ChatId, UserId, TEXT("RelativeLocation"));
     }
 
     if (bRotationChanged)
     {
         UE_LOG(LogTemp, Warning, TEXT("[TrackLog] %s rotation changed — UUID: %s — Rot: %s — Time: %s"),
             *Actor->GetName(), *UUID, *CurrentTransform.GetRotation().Rotator().ToCompactString(), *TimeStr);
-        SendActorTrackLog(Actor, UUID, ChatId, TEXT("RelativeRotation"));
+        SendActorTrackLog(Actor, UUID, ChatId, UserId, TEXT("RelativeRotation"));
     }
 
     if (bScaleChanged)
     {
         UE_LOG(LogTemp, Warning, TEXT("[TrackLog] %s scale changed — UUID: %s — Scale: %s — Time: %s"),
             *Actor->GetName(), *UUID, *CurrentTransform.GetScale3D().ToCompactString(), *TimeStr);
-        SendActorTrackLog(Actor, UUID, ChatId, TEXT("RelativeScale3D"));
+        SendActorTrackLog(Actor, UUID, ChatId, UserId, TEXT("RelativeScale3D"));
     }
 
     // 캐시 갱신
@@ -565,7 +574,7 @@ FString FAssetTrackerModule::GetUUIDFromMaterial(UMaterialInterface* Material)
         }
     }
 
-    // ③ Material Graph 내부 Expression 수동 탐색 (💥 핵심)
+    // ③ Material Graph 내부 Expression 수동 탐색
 #if WITH_EDITOR
     if (UMaterial* BaseMat = Cast<UMaterial>(Material))
     {
@@ -687,7 +696,7 @@ UWorld* FAssetTrackerModule::GetWorld() const
     return nullptr;
 }
 
-void FAssetTrackerModule::SendActorTrackLog(AActor* Actor, const FString& UUID, int32 ChatId, const FString& Property)
+void FAssetTrackerModule::SendActorTrackLog(AActor* Actor, const FString& UUID, int32 ChatId, int32 UserId, const FString& Property)
 {
     UE_LOG(LogTemp, Warning, TEXT("[TrackLog] Enter: %s / %s / %d / %s"),
         *Actor->GetName(), *UUID, ChatId, *Property);
@@ -741,18 +750,18 @@ void FAssetTrackerModule::SendActorTrackLog(AActor* Actor, const FString& UUID, 
 
     TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = FHttpModule::Get().CreateRequest();
 
-    FString Url = FString::Printf(TEXT("http://13.125.77.82:8080/api/v1/unreal-history/%d"), ChatId);  // TODO : 나중에 /%d 전까지 배포 주소로 수정
-    //Request->SetURL(TEXT("https://httpbin.org/post"));
-    Request->SetURL(Url);
+    //FString Url = FString::Printf(TEXT("http://13.125.77.82:8080/api/v1/unreal-history/%d"), ChatId);  // TODO : 나중에 /%d 전까지 배포 주소로 수정
+    Request->SetURL(TEXT("https://httpbin.org/post"));
+    //Request->SetURL(Url);
     //Request->SetURL(TEXT("http://localhost:8080/api/v1/unreal-history/{chatId}"));
     Request->SetVerb("POST");
     Request->SetHeader(TEXT("Content-Type"), TEXT("application/json"));
-    //Request->SetHeader(TEXT("user-no"), TEXT("4"));
+    Request->SetHeader(TEXT("userId"), FString::FromInt(UserId));
 
     Request->SetContentAsString(OutputString);
 
     UE_LOG(LogTemp, Warning, TEXT("[TrackLog] JSON Sent: %s"), *OutputString);
-    UE_LOG(LogTemp, Warning, TEXT("[TrackLog] POST to %s"), *Url);
+    //UE_LOG(LogTemp, Warning, TEXT("[TrackLog] POST to %s"), *Url);
 
     Request->OnProcessRequestComplete().BindRaw(this, &FAssetTrackerModule::OnHttpResponse);
 

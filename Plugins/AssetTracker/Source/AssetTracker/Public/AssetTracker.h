@@ -20,6 +20,7 @@ struct FMetaEntry
 {
     FString Uuid;
     int32   ChatId;
+    int32 UserId;
 };
 
 class FAssetTrackerModule : public IModuleInterface
@@ -48,7 +49,7 @@ private:
     void CheckMaterialUsageInLevel(UMaterialInterface* Material);
     void OnMaterialUsageChanged();
 
-    void SendActorTrackLog(AActor* Actor, const FString& UUID, int32 ChatId, const FString& Property);
+    void SendActorTrackLog(AActor* Actor, const FString& UUID, int32 ChatId, int32 UserId, const FString& Property);
     void OnHttpResponse(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bWasSuccessful);
 
     // Utility functions
