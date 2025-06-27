@@ -713,6 +713,9 @@ void FAssetTrackerModule::SendActorTrackLog(AActor* Actor, const FString& UUID, 
     FString Timestamp = FDateTime::UtcNow().ToIso8601();
     JsonObject->SetStringField("timestamp", Timestamp);
 
+    TArray<TSharedPtr<FJsonValue>> JsonArray;
+    JsonArray.Add(MakeShareable(new FJsonValueObject(JsonObject)));
+
    /* if (Property == "RelativeLocation")
     {
        FVector Loc = Actor->GetActorLocation();
@@ -743,16 +746,16 @@ void FAssetTrackerModule::SendActorTrackLog(AActor* Actor, const FString& UUID, 
 
     FString OutputString;
     TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&OutputString);
-    FJsonSerializer::Serialize(JsonObject.ToSharedRef(), Writer);
+    FJsonSerializer::Serialize(JsonArray, Writer);
     //FJsonSerializer::Serialize(JsonObject, Writer);
 
 
 
     TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = FHttpModule::Get().CreateRequest();
 
-    //FString Url = FString::Printf(TEXT("http://13.125.77.82:8080/api/v1/unreal-history/%d"), ChatId);  // TODO : 나중에 /%d 전까지 배포 주소로 수정
-    Request->SetURL(TEXT("https://httpbin.org/post"));
-    //Request->SetURL(Url);
+    FString Url = FString::Printf(TEXT("http://13.125.77.82:8080/api/v1/unreal-history/%d"), ChatId);  // TODO : 나중에 /%d 전까지 배포 주소로 수정
+    //Request->SetURL(TEXT("https://httpbin.org/post"));
+    Request->SetURL(Url);
     //Request->SetURL(TEXT("http://localhost:8080/api/v1/unreal-history/{chatId}"));
     Request->SetVerb("POST");
     Request->SetHeader(TEXT("Content-Type"), TEXT("application/json"));
