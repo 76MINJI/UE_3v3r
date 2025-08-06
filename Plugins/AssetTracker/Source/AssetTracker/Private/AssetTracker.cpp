@@ -2,7 +2,7 @@
 
 #include "AssetTracker.h"
 #include "Modules/ModuleManager.h"
-#include "AssetRegistryModule.h"
+#include "AssetRegistry/AssetRegistryModule.h"
 #include "EditorAssetLibrary.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
